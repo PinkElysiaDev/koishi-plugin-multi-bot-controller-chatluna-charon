@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-multi-bot-controller-chatluna-charon",
-  "description": "\u0016\u0016\u0016The ancient Greek god in charge of multi-bot message adaption for Chatluna",
-  "version": "0.0.1",
+  "description": "Multi-bot persona management plugin for Koishi ChatLuna, enabling different bots to use different presets and models with isolated conversation history.",
+  "version": "0.1.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -9,14 +9,43 @@
     "dist"
   ],
   "license": "MIT",
-  "scripts": {},
   "keywords": [
     "chatbot",
     "koishi",
-    "plugin"
+    "plugin",
+    "chatluna",
+    "multi-bot",
+    "persona"
   ],
-  "devDependencies": {},
   "peerDependencies": {
-    "koishi": "^4.18.7"
+    "koishi": "^4.18.7",
+    "koishi-plugin-chatluna": "^4.0.0",
+    "koishi-plugin-multi-bot-controller": "^1.0.3",
+    "@koishijs/plugin-server": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "koishi-plugin-chatluna-character": {
+      "optional": true
+    },
+    "koishi-plugin-chatluna-long-memory": {
+      "optional": true
+    },
+    "@koishijs/plugin-server": {
+      "optional": true
+    }
+  },
+  "koishi": {
+    "description": {
+      "zh": "为 Koishi ChatLuna 提供多 Bot 人设管理功能，让不同的 Bot 可以使用不同的预设和模型，并隔离对话历史。"
+    },
+    "service": {
+      "required": [
+        "chatluna",
+        "multi-bot-controller"
+      ],
+      "optional": [
+        "chatluna_character"
+      ]
+    }
   }
 }
