@@ -12,6 +12,7 @@ import { BotPersonaConfig } from '../types'
 export class RoomInterceptor {
   private readonly logger: ReturnType<Context['logger']>
   private hooks: Array<() => void> = []
+  private hooksInstalled = false
 
   constructor(
     private ctx: Context,
@@ -30,18 +31,52 @@ export class RoomInterceptor {
   async start(): Promise<void> {
     this.debug('启动 Room 隔离拦截器...')
 
-    // 等待 ChatLuna 加载完成后再设置所有钩子
-    const readyDispose = this.ctx.on('chatluna/ready', () => {
+    // 安装 bot-status-updated 钩子的方法
+    const installHooks = (): boolean => {
+      if (this.hooksInstalled) {
+        this.debug('Room 钩子已安装，跳过重复安装')
+        return true
+      }
+
+      // 确保数据库服务已就绪
+      if (!this.ctx.database) {
+        return false
+      }
+
       // 监听 bot 状态变化，为新的 bot 创建 template room
-      // 在 chatluna/ready 后设置，确保 database 服务已就绪
       const botStatusDispose = this.ctx.on('bot-status-updated', async (bot) => {
         await this.handleBotStatusUpdate(bot)
       })
       this.hooks.push(botStatusDispose)
 
+      this.hooksInstalled = true
       this.debug('Room 钩子已安装，bot-status-updated 监听已启用')
+      return true
+    }
+
+    // 方式1：监听 chatluna/ready 事件（处理 ChatLuna 后启动的情况）
+    this.ctx.on('chatluna/ready', () => {
+      this.debug('[Charon/Room] 收到 chatluna/ready 事件，安装钩子')
+      installHooks()
     })
-    this.hooks.push(readyDispose)
+
+    // 方式2：立即检查一次（处理 ChatLuna 已先就绪的情况）
+    if (!installHooks()) {
+      // 方式3：延迟轮询检查（处理插件重载场景）
+      let checkCount = 0
+      const maxChecks = 20
+      const checkTimer = setInterval(() => {
+        checkCount++
+        if (installHooks() || checkCount >= maxChecks) {
+          clearInterval(checkTimer)
+          if (checkCount >= maxChecks && !this.hooksInstalled) {
+            this.logger.warn('[Charon/Room] 未能成功安装钩子，database 服务不可用')
+          }
+        }
+      }, 500)
+
+      this.hooks.push(() => clearInterval(checkTimer))
+    }
   }
 
   /**

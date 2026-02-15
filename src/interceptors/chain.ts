@@ -46,17 +46,42 @@ export class ChainInterceptor {
   async start(): Promise<void> {
     this.logger.info('启动 Chain 中间件拦截器...')
 
-    // 等待 ChatLuna 加载完成
+    // 检查 ChatLuna chatChain 是否已就绪并注册中间件
+    const checkAndSetup = (): boolean => {
+      const chatlunaService = this.ctx.chatluna as any
+      const chain = chatlunaService?.chatChain as any
+
+      if (chain && !this.setupMiddlewareRegistered) {
+        this.logger.info('[Charon] 检测到 ChatLuna chatChain 已就绪，开始注册中间件')
+        this.setupChainMiddleware()
+        return true
+      }
+      return false
+    }
+
+    // 方式1：监听 chatluna/ready 事件（处理 ChatLuna 后启动的情况）
     this.ctx.on('chatluna/ready', () => {
       this.logger.info('[Charon] 收到 chatluna/ready 事件，开始注册中间件')
-      this.setupChainMiddleware()
+      checkAndSetup()
     })
 
-    // 移除备用定时器，防止重复注册中间件
-    // setTimeout(() => {
-    //   this.logger.info('[Charon] 备用检查：尝试立即注册中间件')
-    //   this.setupChainMiddleware()
-    // }, 5000)
+    // 方式2：立即检查一次（处理 ChatLuna 已先就绪的情况）
+    if (!checkAndSetup()) {
+      // 方式3：延迟轮询检查（处理插件重载场景）
+      let checkCount = 0
+      const maxChecks = 20
+      const checkTimer = setInterval(() => {
+        checkCount++
+        if (checkAndSetup() || checkCount >= maxChecks) {
+          clearInterval(checkTimer)
+          if (checkCount >= maxChecks && !this.setupMiddlewareRegistered) {
+            this.logger.warn('[Charon] 未能成功注册中间件，ChatLuna chatChain 不可用')
+          }
+        }
+      }, 500)
+
+      this.middlewareDisposes.push(() => clearInterval(checkTimer))
+    }
   }
 
   /**
